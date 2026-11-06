@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#090d16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Robô 4x4 – Cortador</title>
+  <style>
+    :root {
+      --bg:       #090d16;
+      --card:     #111827;
+      --subtle:   #172133;
+      --canvas-bg:#050b14;
+      --term-bg:  #030712;
+      --border:   #1f2937;
+      --text:     #f9fafb;
+      --muted:    #9ca3af;
+      --dim:      #6b7280;
+      --green:    #10b981;
+      --green-g:  rgba(16,185,129,.35);
+      --green-d:  #059669;
+      --blue:     #38bdf8;
+      --blue-g:   rgba(56,189,248,.35);
+      --blue-d:   #0284c7;
+      --red:      #ef4444;
+      --red-g:    rgba(239,68,68,.35);
+      --yellow:   #facc15;
+      --orange:   #f97316;
+      --r-sm:8px; --r-md:12px;
+      --mono:'Consolas','Courier New',monospace;
+      --sans:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      --tab-h:56px;
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    html,body{height:100%;}
+
+    body{
+      background:var(--bg);
+      color:var(--text);
+      font-family:var(--sans);
+      display:flex;flex-direction:column;
+      overflow-x:hidden;
+      line-height:1.5;
+      /* espaço para bottom-nav no mobile */
+      padding-bottom:0;
+    }
+
+    /* ── BG GRID ─────────────────────────────────── */
+    body::before{
+      content:"";position:fixed;inset:0;
+      background-image:
+        radial-gradient(circle at 15% 20%,rgba(16,185,129,.05) 0%,transparent 40%),
+        radial-gradient(circle at 85% 80%,rgba(56,189,248,.05) 0%,transparent 40%),
+        linear-gradient(rgba(31,41,55,.12) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(31,41,55,.12) 1px,transparent 1px);
+      background-size:100% 100%,100% 100%,40px 40px,40px 40px;
+      pointer-events:none;z-index:-1;
+    }
+
+    /* ── HEADER ──────────────────────────────────── */
+    header{
+      background:rgba(17,24,39,.92);
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
+      border-bottom:1px solid var(--border);
+      padding:10px 16px;
+      display:flex;justify-content:space-between;align-items:center;
+      position:sticky;top:0;z-index:100;
+      gap:8px;flex-wrap:wrap;
+    }
+    .logo{
+      font-size:1.05rem;font-weight:800;
+      color:var(--green);
+      text-shadow:0 0 14px var(--green-g);
+      display:flex;align-items:center;gap:8px;
+    }
+    .badge-ver{
+      font-size:.6rem;font-weight:700;
+      padding:2px 6px;border-radius:999px;
+      background:rgba(56,189,248,.12);
+      color:var(--blue);border:1px solid rgba(56,189,248,.35);
+    }
+
+    /* ── STATUS BADGE ────────────────────────────── */
+    .sbadge{
+      display:flex;align-items:center;gap:6px;
+      padding:5px 11px;border-radius:999px;
+      font-size:.78rem;font-weight:700;
+      user-select:none;transition:all .3s;
+      white-space:nowrap;
+    }
+    .sbadge.off {background:#1a2234;color:var(--muted);border:1px solid var(--border);}
+    .sbadge.on  {background:rgba(16,185,129,.14);color:var(--green);border:1px solid var(--green);box-shadow:0 0 12px var(--green-g);}
+    .sbadge.warn{background:rgba(249,115,22,.14);color:var(--orange);border:1px solid var(--orange);box-shadow:0 0 12px rgba(249,115,22,.35);animation:blink .9s infinite;}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.55}}
+
+    .sdot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0;}
+    .sbadge.on   .sdot{animation:pulse 1.5s infinite;}
+    .sbadge.warn .sdot{animation:pulse .7s infinite;}
+    @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.5}}
+
+    /* ── LAYOUT DESKTOP ──────────────────────────── */
+    main{
+      flex:1;display:grid;
+      grid-template-columns:300px 1fr;
+      gap:12px;padding:12px;
+      max-width:1600px;width:100%;margin:0 auto;
+    }
+    .col-left {display:flex;flex-direction:column;gap:10px;}
+    .col-right{display:flex;flex-direction:column;gap:10px;}
+
+    /* ── MOBILE: abas ────────────────────────────── */
+    @media(max-width:767px){
+      body{padding-bottom:var(--tab-h);}
+
+      main{
+        display:block;
+        padding:8px;
+      }
+
+      .tab-pane{display:none;}
+      .tab-pane.active{display:flex;flex-direction:column;gap:8px;}
+
+      .bottom-nav{
+        position:fixed;bottom:0;left:0;right:0;
+        height:var(--tab-h);
+        background:rgba(17,24,39,.96);
+        backdrop-filter:blur(14px);
+        -webkit-backdrop-filter:blur(14px);
+        border-top:1px solid var(--border);
+        display:flex;
+        z-index:200;
+      }
+      .tab-btn{
+        flex:1;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;
+        gap:3px;font-size:.63rem;font-weight:600;
+        color:var(--muted);background:none;border:none;
+        cursor:pointer;padding:6px 0;
+        transition:color .2s;
+      }
+      .tab-btn .tab-icon{font-size:1.2rem;line-height:1;}
+      .tab-btn.active{color:var(--blue);}
+      .tab-btn.active .tab-icon{filter:drop-shadow(0 0 4px var(--blue));}
+    }
+
+    @media(min-width:768px){
+      .bottom-nav{display:none;}
+      .tab-pane{display:flex !important;flex-direction:column;gap:10px;}
+    }
+
+    /* ── CARD ────────────────────────────────────── */
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--r-md);
+      padding:14px;
+      box-shadow:0 4px 18px rgba(0,0,0,.4);
+      transition:border-color .2s;
+    }
+    .card:focus-within{border-color:rgba(56,189,248,.3);}
+    .card-title{
+      font-size:.8rem;font-weight:700;
+      text-transform:uppercase;letter-spacing:.7px;
+      color:var(--blue);margin-bottom:10px;
+      display:flex;align-items:center;gap:6px;
+    }
+
+    /* ── BOTÕES ──────────────────────────────────── */
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      width:100%;
+      min-height:44px; /* touch target mínimo */
+      padding:10px 14px;
+      border-radius:var(--r-sm);
+      font-size:.86rem;font-weight:700;
+      cursor:pointer;border:1px solid transparent;
+      transition:all .18s ease;
+      user-select:none;white-space:nowrap;
+      -webkit-appearance:none;
+    }
+    .btn:active{transform:scale(.97);}
+    .btn:disabled{opacity:.38;cursor:not-allowed;transform:none;}
+
+    .btn-blue  {background:linear-gradient(135deg,var(--blue-d),#0369a1);color:#fff;border-color:var(--blue);box-shadow:0 0 10px rgba(56,189,248,.18);}
+    .btn-blue:not(:disabled):hover{box-shadow:0 0 18px var(--blue-g);}
+
+    .btn-red   {background:linear-gradient(135deg,#b91c1c,#991b1b);color:#fff;border-color:var(--red);box-shadow:0 0 10px var(--red-g);}
+    .btn-red:not(:disabled):hover{box-shadow:0 0 18px var(--red-g);}
+
+    .btn-green {background:linear-gradient(135deg,var(--green-d),#047857);color:#fff;border-color:var(--green);box-shadow:0 0 10px var(--green-g);}
+    .btn-green:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 0 22px rgba(16,185,129,.55);}
+
+    .btn-orange{background:linear-gradient(135deg,#c2410c,#9a3412);color:#fff;border-color:var(--orange);}
+    .btn-orange:not(:disabled):hover{box-shadow:0 0 18px rgba(249,115,22,.45);}
+
+    .btn-yellow{background:linear-gradient(135deg,#a16207,#78350f);color:#fff;border-color:var(--yellow);}
+    .btn-yellow:not(:disabled):hover{box-shadow:0 0 18px rgba(250,204,21,.4);}
+
+    .btn-ghost {background:var(--subtle);color:var(--text);border-color:var(--border);}
+    .btn-ghost:not(:disabled):hover{border-color:var(--blue);color:var(--blue);}
+
+    .btn-sm{min-height:36px;padding:6px 10px;font-size:.75rem;}
+
+    .bgrp  {display:flex;flex-direction:column;gap:7px;}
+    .brow  {display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+    .brow-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+
+    /* ── INPUTS ──────────────────────────────────── */
+    .form-label{
+      display:flex;justify-content:space-between;
+      font-size:.74rem;color:var(--muted);
+      margin-bottom:4px;font-weight:500;
+    }
+    .form-label .unit{color:var(--blue);font-family:var(--mono);}
+
+    .field{
+      width:100%;
+      background:#0b111d;
+      border:1px solid var(--border);
+      border-radius:var(--r-sm);
+      padding:9px 11px;
+      color:var(--text);
+      font-size:.92rem;
+      font-family:var(--mono);
+      min-height:44px;
+      transition:all .2s;
+      -webkit-appearance:none;
+    }
+    .field:focus{outline:none;border-color:var(--blue);box-shadow:0 0 10px var(--blue-g);background:#0f172a;}
+    .field:disabled{background:#070c14;color:#64748b;cursor:not-allowed;border-style:dashed;}
+
+    .dim-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+
+    /* ── HUD MINI-CARDS ──────────────────────────── */
+    .hud-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px;}
+    .mini{background:#0a101b;border:1px solid var(--border);border-radius:var(--r-sm);padding:9px;}
+    .mini-lbl{font-size:.64rem;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin-bottom:2px;}
+    .mini-val{font-size:.92rem;font-weight:700;font-family:var(--mono);line-height:1.3;}
+    .c-green {color:var(--green);text-shadow:0 0 8px var(--green-g);}
+    .c-blue  {color:var(--blue); text-shadow:0 0 8px var(--blue-g);}
+    .c-yellow{color:var(--yellow);}
+    .c-orange{color:var(--orange);}
+    .c-red   {color:var(--red);}
+
+    /* ── PROGRESS ────────────────────────────────── */
+    .prog-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:.74rem;}
+    .prog-pct{font-size:1.05rem;font-weight:800;color:var(--green);font-family:var(--mono);text-shadow:0 0 10px var(--green-g);}
+    .prog-track{width:100%;height:10px;background:#0b111e;border:1px solid var(--border);border-radius:999px;overflow:hidden;padding:2px;margin-bottom:4px;}
+    .prog-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--green-d),var(--green));border-radius:999px;box-shadow:0 0 8px var(--green);transition:width .12s ease-out;}
+    .eta-row{display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);}
+    .eta-val{color:var(--yellow);font-family:var(--mono);font-weight:600;}
+
+    /* ── RELAY PILL ──────────────────────────────── */
+    .relay-pill{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:7px 11px;background:#0b111e;
+      border:1px solid var(--border);border-radius:var(--r-sm);margin-top:8px;font-size:.73rem;
+    }
+    .relay-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:all .3s;}
+    .relay-dot.off   {background:var(--red);  box-shadow:0 0 5px var(--red);}
+    .relay-dot.cut   {background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1s infinite;}
+    .relay-dot.home  {background:var(--yellow);box-shadow:0 0 8px var(--yellow);animation:pulse 1.2s infinite;}
+    .relay-dot.done  {background:var(--green);box-shadow:0 0 8px var(--green);}
+
+    /* ── BANNER ──────────────────────────────────── */
+    .banner{
+      display:none;align-items:center;justify-content:space-between;gap:8px;
+      background:rgba(249,115,22,.13);
+      border:1px solid var(--orange);
+      border-radius:var(--r-sm);
+      padding:8px 12px;margin-bottom:8px;
+      font-size:.8rem;color:var(--orange);
+    }
+    .banner.show{display:flex;}
+
+    /* ── MISSION STATUS TEXT ─────────────────────── */
+    .mission-text{font-size:.73rem;color:var(--muted);margin-top:8px;min-height:1.2em;}
+
+    /* ── PRESETS ─────────────────────────────────── */
+    .presets{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;align-items:center;}
+    .presets span{font-size:.68rem;color:var(--muted);}
+
+    /* ── CANVAS CARD ─────────────────────────────── */
+    .canvas-card{display:flex;flex-direction:column;min-height:340px;padding:10px;}
+    @media(max-width:767px){.canvas-card{min-height:280px;}}
+
+    .canvas-toolbar{
+      display:flex;justify-content:space-between;align-items:center;
+      margin-bottom:7px;padding-bottom:7px;
+      border-bottom:1px solid rgba(31,41,55,.7);
+      flex-wrap:wrap;gap:5px;
+    }
+    .canvas-info{font-size:.69rem;font-family:var(--mono);color:var(--blue);display:flex;gap:10px;flex-wrap:wrap;}
+
+    .canvas-wrap{
+      position:relative;flex:1;
+      min-height:260px;
+      background:var(--canvas-bg);
+      border:1px solid var(--border);
+      border-radius:var(--r-md);
+      overflow:hidden;
+      box-shadow:inset 0 0 30px rgba(0,0,0,.75);
+    }
+    @media(max-width:767px){.canvas-wrap{min-height:230px;}}
+
+    canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none;}
+    canvas.grab{cursor:grabbing;}
+
+    /* ── TERMINAL ────────────────────────────────── */
+    .term-card{padding:10px;}
+    .term-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:5px;}
+    .term-title{font-size:.76rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;}
+    .term-icon{color:var(--green);}
+    .term-out{
+      height:120px;background:var(--term-bg);
+      border:1px solid var(--border);border-radius:var(--r-sm);
+      padding:8px;overflow-y:auto;
+      font-family:var(--mono);font-size:.74rem;line-height:1.45;
+      display:flex;flex-direction:column;gap:2px;
+    }
+    .log{display:flex;gap:6px;word-break:break-all;}
+    .ts {color:#4b5563;flex-shrink:0;user-select:none;}
+    .lt {flex:1;}
+    .ls{color:var(--green)}.le{color:var(--red)}.lw{color:var(--yellow)}.li{color:var(--blue)}.lr{color:#a7f3d0}.lx{color:#bae6fd}.lo{color:var(--orange)}
+
+    .term-input-row{display:flex;gap:6px;margin-top:6px;}
+    .term-input{
+      flex:1;background:#090e18;
+      border:1px solid var(--border);border-radius:var(--r-sm);
+      padding:7px 9px;color:var(--blue);
+      font-family:var(--mono);font-size:.76rem;min-height:36px;
+      -webkit-appearance:none;
+    }
+    .term-input:focus{outline:none;border-color:var(--blue);}
+
+    /* ── TOAST NOTIFICATION ──────────────────────── */
+    #toast{
+      position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+      background:rgba(17,24,39,.97);border:1px solid var(--border);
+      border-radius:var(--r-sm);padding:10px 18px;
+      font-size:.82rem;color:var(--text);
+      box-shadow:0 8px 24px rgba(0,0,0,.6);
+      z-index:999;opacity:0;pointer-events:none;
+      transition:opacity .3s;white-space:nowrap;
+    }
+    #toast.show{opacity:1;}
+    @media(min-width:768px){#toast{bottom:20px;}}
+
+    /* ── SCROLLBAR ───────────────────────────────── */
+    ::-webkit-scrollbar{width:4px;height:4px;}
+    ::-webkit-scrollbar-track{background:var(--term-bg);}
+    ::-webkit-scrollbar-thumb{background:#1f2937;border-radius:2px;}
+  </style>
+</head>
+<body>
+
+  <!-- ══════════════ HEADER ══════════════ -->
+  <header>
+    <div class="logo">
+      🤖 Robô 4x4 - Cortador
+      <span class="badge-ver">HC-05 · MEGA</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div id="badge" class="sbadge off"><span class="sdot"></span><span id="badgeTxt">Desconectado</span></div>
+    </div>
+  </header>
+
+  <!-- ══════════════ MAIN GRID ══════════════ -->
+  <main>
+
+    <!-- ── COLUNA ESQUERDA / TAB CONTROLE ── -->
+    <div class="col-left tab-pane active" id="paneControl">
+
+      <!-- Bloco: Bluetooth -->
+      <section class="card">
+        <h2 class="card-title">📡 Bluetooth HC-05</h2>
+        <div id="disconnBanner" class="banner">
+          <span>⚠️ Conexão perdida</span>
+          <button id="btnReconnect" class="btn btn-orange btn-sm">🔄 Reconectar</button>
+        </div>
+        <div class="bgrp">
+          <button id="btnConnect"    class="btn btn-blue"  >🔗 Conectar HC-05</button>
+          <button id="btnDisconnect" class="btn btn-red"   style="display:none">✖ Desconectar</button>
+        </div>
+        <div style="margin-top:7px;font-size:.68rem;color:var(--dim);display:flex;justify-content:space-between;">
+          <span>9600 bps</span><span>Web Serial API</span>
+        </div>
+      </section>
+
+      <!-- Bloco: Dimensões -->
+      <section class="card">
+        <h2 class="card-title">📐 Dimensões do Terreno</h2>
+        <div class="dim-row">
+          <div>
+            <div class="form-label"><span>Comprimento H</span><span class="unit">m</span></div>
+            <input type="number" id="inH" class="field" value="2.0" step="0.5" min="0.5" max="100">
+          </div>
+          <div>
+            <div class="form-label"><span>Largura B</span><span class="unit">m</span></div>
+            <input type="number" id="inB" class="field" value="1.0" step="0.5" min="0.2" max="100">
+          </div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div class="form-label"><span>Faixa de Corte</span><span class="unit">fixo</span></div>
+          <input type="text" class="field" value="0.20 m (20 cm)" disabled>
+        </div>
+        <div class="bgrp">
+          <button id="btnStart"  class="btn btn-green">▶ Iniciar Missão</button>
+          <button id="btnSim"    class="btn btn-ghost" >⚡ Simular Animação</button>
+        </div>
+        <div class="presets">
+          <span>Presets:</span>
+          <button type="button" class="btn btn-ghost btn-sm preset-btn" onclick="applyPreset(2,1)">2×1m</button>
+          <button type="button" class="btn btn-ghost btn-sm preset-btn" onclick="applyPreset(3,1.6)">3×1.6m</button>
+          <button type="button" class="btn btn-ghost btn-sm preset-btn" onclick="applyPreset(4,2)">4×2m</button>
+          <button type="button" class="btn btn-ghost btn-sm preset-btn" onclick="applyPreset(6,4)">6×4m</button>
+        </div>
+      </section>
+
+      <!-- Bloco: Controles de Missão -->
+      <section class="card">
+        <h2 class="card-title">🎮 Controles</h2>
+        <div class="brow" style="margin-bottom:7px;">
+          <button id="btnPause"  class="btn btn-yellow" disabled>⏸ Pausar</button>
+          <button id="btnResume" class="btn btn-green"  disabled style="display:none">▶ Retomar</button>
+          <button id="btnGoHome" class="btn btn-blue"   disabled>⏹ Parada segura</button>
+        </div>
+        <button id="btnCancel" class="btn btn-red" disabled>✖ Cancelar Missão</button>
+        <div class="mission-text" id="statusTxt">Aguardando início…</div>
+      </section>
+
+      <!-- Bloco: Telemetria HUD -->
+      <section class="card">
+        <h2 class="card-title">📊 Telemetria</h2>
+        <div class="hud-grid">
+          <div class="mini"><div class="mini-lbl">Posição</div><div id="hudPos" class="mini-val c-blue">X:0.00 Y:0.00</div></div>
+          <div class="mini"><div class="mini-lbl">Área Cortada</div><div id="hudArea" class="mini-val c-green">0.00 m²</div></div>
+          <div class="mini"><div class="mini-lbl">Faixas OK</div><div id="hudLanes" class="mini-val c-yellow">0 / 5</div></div>
+          <div class="mini"><div class="mini-lbl">Velocidade est.</div><div id="hudSpeed" class="mini-val c-orange">0.00 m/s</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-bottom:6px;">
+          <span>Total: <strong id="hudTotal" style="color:var(--text)">2.00 m²</strong></span>
+          <span>Faixas: <strong id="hudFaixas" style="color:var(--blue)">5</strong></span>
+        </div>
+        <!-- Progresso -->
+        <div class="prog-row">
+          <span style="font-size:.7rem;color:var(--muted);text-transform:uppercase">Progresso</span>
+          <span id="hudPct" class="prog-pct">0%</span>
+        </div>
+        <div class="prog-track"><div id="hudBar" class="prog-fill"></div></div>
+        <div class="eta-row">
+          <span>Restante: <span id="etaVal" class="eta-val">--:--</span></span>
+          <span>Decorrido: <span id="elapsed" class="eta-val">00:00</span></span>
+        </div>
+        <!-- Duração da simulação informativa -->
+        <div style="margin-top:5px;font-size:.68rem;color:var(--dim);">
+          Sim. duração: <span id="simDurLabel" style="color:var(--muted)">--:--</span>
+        </div>
+        <!-- Relé -->
+        <div class="relay-pill">
+          <span style="color:var(--muted)">Relé das Lâminas:</span>
+          <div style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:700;font-size:.76rem;">
+            <span id="relayDot" class="relay-dot off"></span>
+            <span id="relayTxt" style="color:var(--red)">DESLIGADO</span>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /pane-control -->
+
+    <!-- ── COLUNA DIREITA / TAB MAPA + LOG ── -->
+    <div class="col-right tab-pane" id="paneMap">
+
+      <!-- Canvas -->
+      <section class="card canvas-card">
+        <div class="canvas-toolbar">
+          <div class="canvas-info">
+            <span>🗺 BOUSTROPHEDON</span>
+            <span id="cScale">100% · 1m=100px</span>
+          </div>
+          <div style="display:flex;gap:5px;">
+            <button id="btnCenter" class="btn btn-ghost btn-sm">🎯 Centralizar</button>
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="cv"></canvas>
+        </div>
+      </section>
+
+      <!-- Terminal -->
+      <section class="card term-card" id="paneLog">
+        <div class="term-hdr">
+          <div class="term-title"><span class="term-icon">❯_</span>Console Serial HC-05</div>
+          <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:.7rem;color:var(--muted);display:flex;align-items:center;gap:3px;cursor:pointer;user-select:none;">
+              <input type="checkbox" id="chkScroll" checked> Auto-scroll
+            </label>
+            <button id="btnClear" class="btn btn-ghost btn-sm">Limpar</button>
+          </div>
+        </div>
+        <div id="termOut" class="term-out">
+          <div class="log"><span class="ts">[00:00:00]</span><span class="lt li">Dashboard iniciado. Conecte o HC-05 ou use Simular.</span></div>
+        </div>
+        <div class="term-input-row">
+          <input type="text" id="cmdIn" class="term-input" placeholder="Comando manual (START, PAUSE, HOME, CANCEL…)">
+          <button id="btnSend" class="btn btn-ghost btn-sm">Enviar</button>
+        </div>
+      </section>
+
+    </div><!-- /pane-map -->
+
+  </main>
+
+  <!-- ══════════════ BOTTOM NAV (MOBILE) ══════════════ -->
+  <nav class="bottom-nav" id="bottomNav" role="tablist">
+    <button class="tab-btn active" data-tab="paneControl" role="tab">
+      <span class="tab-icon">🎮</span>Controle
+    </button>
+    <button class="tab-btn" data-tab="paneMap" role="tab">
+      <span class="tab-icon">🗺️</span>Mapa
+    </button>
+    <button class="tab-btn" data-tab="paneLog" role="tab">
+      <span class="tab-icon">📋</span>Log
+    </button>
+  </nav>
+
+  <!-- Toast notification -->
+  <div id="toast"></div>
+
+  <script>
+  /* ════════════════════════════════════════════════════════
+     CONSTANTES
+  ════════════════════════════════════════════════════════ */
+  const CHASSIS_W   = 0.20;   // m
+  const ROBOT_SPEED = 0.4;    // m/s (estimativa da velocidade do robô)
+  const SIM_MIN_MS  = 60;     // ms por step na simulação (mínimo, áreas pequenas)
+  const SIM_MAX_MS  = 900;    // ms por step na simulação (máximo, áreas grandes)
+
+  /* ════════════════════════════════════════════════════════
+     ESTADO
+  ════════════════════════════════════════════════════════ */
+  let paramH = 2.0, paramB = 1.0;
+  let targetProg  = 0, curProg = 0;
+
+  // Estados: idle | running | paused | homing | done | cancelled
+  let mState = 'idle';
+
+  let robotX=0, robotY=0, robotAngle=0;
+
+  // Câmera
+  let vx=0, vy=0, vzoom=1;
+  let drag=false, dragX=0, dragY=0;
+
+  // Cronômetro
+  let mStartTime=null, mPauseAcc=0, mPauseStart=null;
+
+  // Rota
+  let segs=[], totalLen=0, nLanes=0;
+
+  // Serial
+  let port=null, reader=null, keepRead=false;
+  let serialWriteQueue=Promise.resolve();
+  let lastPortRef=null; // guarda referência para reconexão
+
+  // Simulação
+  let simTimer=null, simRunning=false;
+  let simIntervalMs=200; // calculado dinamicamente
+
+  // Wake Lock (mantém tela acesa durante missão)
+  let wakeLock=null;
+
+  /* ════════════════════════════════════════════════════════
+     DOM
+  ════════════════════════════════════════════════════════ */
+  const $badge       = document.getElementById('badge');
+  const $badgeTxt    = document.getElementById('badgeTxt');
+  const $btnConnect  = document.getElementById('btnConnect');
+  const $btnDisconn  = document.getElementById('btnDisconnect');
+  const $btnReconn   = document.getElementById('btnReconnect');
+  const $banner      = document.getElementById('disconnBanner');
+
+  const $inH = document.getElementById('inH');
+  const $inB = document.getElementById('inB');
+
+  const $btnStart  = document.getElementById('btnStart');
+  const $btnSim    = document.getElementById('btnSim');
+  const $btnPause  = document.getElementById('btnPause');
+  const $btnResume = document.getElementById('btnResume');
+  const $btnHome   = document.getElementById('btnGoHome');
+  const $btnCancel = document.getElementById('btnCancel');
+  const $statusTxt = document.getElementById('statusTxt');
+
+  const $hudPos    = document.getElementById('hudPos');
+  const $hudArea   = document.getElementById('hudArea');
+  const $hudLanes  = document.getElementById('hudLanes');
+  const $hudSpeed  = document.getElementById('hudSpeed');
+  const $hudTotal  = document.getElementById('hudTotal');
+  const $hudFaixas = document.getElementById('hudFaixas');
+  const $hudPct    = document.getElementById('hudPct');
+  const $hudBar    = document.getElementById('hudBar');
+  const $etaVal    = document.getElementById('etaVal');
+  const $elapsed   = document.getElementById('elapsed');
+  const $simDur    = document.getElementById('simDurLabel');
+  const $relayDot  = document.getElementById('relayDot');
+  const $relayTxt  = document.getElementById('relayTxt');
+
+  const $termOut  = document.getElementById('termOut');
+  const $chkScroll= document.getElementById('chkScroll');
+  const $btnClear = document.getElementById('btnClear');
+  const $cmdIn    = document.getElementById('cmdIn');
+  const $btnSend  = document.getElementById('btnSend');
+
+  const canvas  = document.getElementById('cv');
+  const ctx     = canvas.getContext('2d');
+  const $wrap   = document.getElementById('canvasWrap');
+  const $cScale = document.getElementById('cScale');
+  const $btnCenter = document.getElementById('btnCenter');
+
+  const $toast  = document.getElementById('toast');
+
+  /* ════════════════════════════════════════════════════════
+     UTILIDADES
+  ════════════════════════════════════════════════════════ */
+  function fmt(sec){
+    if(!isFinite(sec)||sec<0) return '--:--';
+    const m=Math.floor(sec/60),s=Math.floor(sec%60);
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function log(txt,cls='i'){
+    const ts=new Date().toTimeString().slice(0,8);
+    const d=document.createElement('div');
+    d.className='log';
+    d.innerHTML=`<span class="ts">[${ts}]</span><span class="lt l${cls}">${esc(txt)}</span>`;
+    $termOut.appendChild(d);
+    if($chkScroll.checked) $termOut.scrollTop=$termOut.scrollHeight;
+    if($termOut.children.length>300) $termOut.removeChild($termOut.firstChild);
+  }
+
+  let toastTmr=null;
+  function toast(msg,color='var(--blue)'){
+    $toast.textContent=msg;
+    $toast.style.borderColor=color;
+    $toast.style.color=color;
+    $toast.classList.add('show');
+    clearTimeout(toastTmr);
+    toastTmr=setTimeout(()=>$toast.classList.remove('show'),3000);
+  }
+
+  function vibrate(pat){ if(navigator.vibrate) navigator.vibrate(pat); }
+
+  async function acquireWakeLock(){
+    if('wakeLock' in navigator){
+      try{ wakeLock=await navigator.wakeLock.request('screen'); }catch(_){}
+    }
+  }
+  function releaseWakeLock(){
+    if(wakeLock){ wakeLock.release(); wakeLock=null; }
+  }
+
+  /* ════════════════════════════════════════════════════════
+     BLUETOOTH / WEB SERIAL
+  ════════════════════════════════════════════════════════ */
+  function setBadge(state){
+    // state: 'off' | 'on' | 'warn'
+    $badge.className=`sbadge ${state}`;
+    $badgeTxt.textContent={off:'Desconectado',on:'Conectado (HC-05)',warn:'Reconectando…'}[state];
+    $btnConnect.style.display  = state==='off'  ? 'inline-flex':'none';
+    $btnDisconn.style.display  = state==='on'   ? 'inline-flex':'none';
+    $banner.classList.toggle('show', state==='warn');
+  }
+
+  // Detecta desconexão global via navigator.serial
+  if('serial' in navigator){
+    navigator.serial.addEventListener('disconnect', e=>{
+      if(port && e.target===port){
+        handleDisconnect('navigator.serial disconnect');
+      }
+    });
+  }
+
+  function handleDisconnect(reason){
+    if(!keepRead && !port) return; // já tratado
+    log(`⚠️ Bluetooth desconectado: ${reason}`,'e');
+    keepRead=false; reader=null;
+    // Não fecha port — mantém referência para reconectar
+    setBadge('warn');
+    toast('Bluetooth desconectado!','var(--red)');
+    vibrate([100,50,100]);
+    if(mState==='running') doPause(true);
+  }
+
+  async function doConnect(savedPort=null){
+    if(!('serial' in navigator)){
+      log('Web Serial API não suportada. Use Chrome, Edge ou Opera.','e');
+      toast('Precisa de Chrome / Edge / Opera','var(--red)');
+      return;
+    }
+    try{
+      if(savedPort){
+        port=savedPort;
+      } else {
+        log('Selecione a porta serial (HC-05)…','i');
+        port=await navigator.serial.requestPort();
+      }
+      lastPortRef=port;
+
+      // Se já estiver aberta, não abre de novo
+      if(!port.readable){
+        await port.open({baudRate:9600});
+      }
+
+      keepRead=true;
+      setBadge('on');
+      log('Conectado ao HC-05 (9600 bps)!','s');
+      toast('Conectado ✓','var(--green)');
+      readLoop();
+    }catch(err){
+      log('Falha ao conectar: '+err.message,'e');
+      setBadge('off');
+      if(port) { try{await port.close();}catch(_){} port=null; }
+    }
+  }
+
+  async function doDisconnect(){
+    keepRead=false;
+    try{ if(reader){ await reader.cancel(); reader=null; } }catch(_){}
+    try{ if(port)  { await port.close();    port=null;   } }catch(_){}
+    lastPortRef=null;
+    setBadge('off');
+    log('HC-05 desconectado pelo usuário.','w');
+    toast('Desconectado','var(--yellow)');
+  }
+
+  async function doReconnect(){
+    log('Tentando reconectar…','o');
+    setBadge('warn');
+
+    // Tenta com a porta que tínhamos antes
+    if(lastPortRef){
+      try{
+        if(!lastPortRef.readable){
+          await lastPortRef.open({baudRate:9600});
+        }
+        port=lastPortRef;
+        keepRead=true;
+        setBadge('on');
+        log('Reconectado com sucesso!','s');
+        toast('Reconectado ✓','var(--green)');
+        readLoop();
+        return;
+      }catch(err){
+        log('Reconexão automática falhou: '+err.message+'. Selecione a porta manualmente.','w');
+      }
+    }
+
+    // Fallback: pede nova porta
+    await doConnect(null);
+  }
+
+  $btnConnect.addEventListener('click', ()=>doConnect(null));
+  $btnDisconn.addEventListener('click', doDisconnect);
+  $btnReconn .addEventListener('click', doReconnect);
+
+  async function sendSerial(txt){
+    if(!port||!port.writable){ log(`[TX FALHA] ${txt.trim()}`,'e'); return false; }
+    const writeJob=serialWriteQueue.then(async()=>{
+      if(!port||!port.writable){ log(`[TX FALHA] ${txt.trim()}`,'e'); return false; }
+      let w=null;
+      try{
+        w=port.writable.getWriter();
+        await w.write(new TextEncoder().encode(txt));
+        log(`[TX] ${txt.trim()}`,'x');
+        return true;
+      }catch(err){
+        log('Erro TX: '+err.message,'e');
+        handleDisconnect('write error');
+        return false;
+      }finally{
+        if(w){ try{ w.releaseLock(); }catch(_){} }
+      }
+    });
+    serialWriteQueue=writeJob.catch(()=>false);
+    return writeJob;
+  }
+
+  async function readLoop(){
+    let buf='';
+    while(port && keepRead){
+      try{
+        // Verifica se a porta ainda está legível
+        if(!port.readable){ handleDisconnect('port.readable null'); break; }
+
+        const tds=new TextDecoderStream();
+        const closed=port.readable.pipeTo(tds.writable);
+        const rdr=tds.readable.getReader();
+        reader=rdr;
+
+        while(keepRead){
+          let result;
+          try{ result=await rdr.read(); }
+          catch(readErr){
+            // Erro de leitura = desconexão
+            handleDisconnect('read error: '+readErr.message);
+            break;
+          }
+          const {value,done}=result;
+          if(done){ handleDisconnect('stream done'); break; }
+          if(value){
+            buf+=value;
+            const lines=buf.split(/\r?\n/);
+            buf=lines.pop();
+            for(const l of lines){ const t=l.trim(); if(t) parseMsg(t); }
+          }
+        }
+        try{ rdr.cancel(); }catch(_){}
+        try{ await closed; }catch(_){}
+      }catch(outer){
+        handleDisconnect('outer loop: '+outer.message);
+        break;
+      }
+    }
+  }
+
+  function parseMsg(line){
+    log(`[RX] ${line}`,'r');
+    const mP=line.match(/Progresso:\s*(\d+(?:\.\d+)?)\s*%/i)||line.match(/Progress:\s*(\d+(?:\.\d+)?)\s*%/i);
+    if(mP){ const p=parseFloat(mP[1]); if(!isNaN(p)) targetProg=Math.min(100,Math.max(0,p)); }
+    if(/conclu|finaliz|done|finish/i.test(line)) finishMission();
+    if(/pause|pausado/i.test(line) && mState==='running'){
+      mState='paused'; mPauseStart=Date.now();
+      setStatus('Pausado pelo robô (obstáculo) ⏸','var(--yellow)');
+      refreshBtns();
+    }
+    if(/resume|retomado/i.test(line) && mState==='paused'){
+      mPauseAcc+=(Date.now()-(mPauseStart??Date.now())); mPauseStart=null;
+      mState='running'; setStatus('Missão em andamento…','var(--green)');
+      refreshBtns();
+    }
+    if(/home|retornando/i.test(line)) mState='homing';
+    if(/cancel/i.test(line)) cancelMission(false);
+  }
+
+  /* ════════════════════════════════════════════════════════
+     TERMINAL MANUAL
+  ════════════════════════════════════════════════════════ */
+  $btnSend.addEventListener('click',()=>{
+    const cmd=$cmdIn.value.trim(); if(!cmd) return;
+    if(isMissionLocked() && /^(?:H|B)\s*(?:[-+]?\d|\.)/i.test(cmd)){
+      log('Dimensões bloqueadas durante a missão. Cancele ou conclua para alterá-las.','w');
+      toast('Terreno bloqueado durante a missão.','var(--yellow)');
+      $cmdIn.value='';
+      return;
+    }
+    if(port) sendSerial(cmd+'\n'); else { log(`[SIM] ${cmd}`,'i'); parseMsg(cmd); }
+    $cmdIn.value='';
+  });
+  $cmdIn.addEventListener('keydown',e=>{ if(e.key==='Enter') $btnSend.click(); });
+  $btnClear.addEventListener('click',()=>{ $termOut.innerHTML=''; log('Terminal limpo.','i'); });
+
+  /* ════════════════════════════════════════════════════════
+     GEOMETRIA
+  ════════════════════════════════════════════════════════ */
+  function computePath(){
+    segs=[]; totalLen=0;
+    nLanes=Math.max(1, Math.round(paramB/CHASSIS_W));
+    const xMin=CHASSIS_W/2;
+    const xMax=Math.max(xMin, paramH-CHASSIS_W/2);
+    const TURN=0.10;
+
+    for(let i=0;i<nLanes;i++){
+      const ly=i*CHASSIS_W+CHASSIS_W/2;
+      const fwd=(i%2===0);
+      const ang=fwd?0:Math.PI;
+      const x1=fwd?xMin:xMax, x2=fwd?xMax:xMin;
+      const lineLen=Math.abs(x2-x1);
+      segs.push({t:'l',li:i,x1,y1:ly,x2,y2:ly,len:lineLen,ang});
+      totalLen+=lineLen;
+      if(i<nLanes-1){
+        const nly=(i+1)*CHASSIS_W+CHASSIS_W/2;
+        segs.push({t:'r',li:i,x:x2,y:ly, fa:ang,       ta:Math.PI/2,len:TURN});  totalLen+=TURN;
+        segs.push({t:'l',li:i,x1:x2,y1:ly,x2:x2,y2:nly,len:Math.abs(nly-ly),ang:Math.PI/2}); totalLen+=Math.abs(nly-ly);
+        const na=(i+1)%2===0?0:Math.PI;
+        segs.push({t:'r',li:i,x:x2,y:nly,fa:Math.PI/2,ta:na, len:TURN});         totalLen+=TURN;
+      }
+    }
+
+    // Calcula e exibe duração da simulação estimada
+    const estSec = totalLen / ROBOT_SPEED;
+    simIntervalMs = Math.min(SIM_MAX_MS, Math.max(SIM_MIN_MS, (estSec*1000)/100));
+    const simSec  = simIntervalMs * 100 / 1000;
+    $simDur.textContent = `${fmt(simSec)} (${simIntervalMs}ms/passo)`;
+  }
+
+  function robotAt(dist){
+    if(!segs.length) return{x:CHASSIS_W/2,y:CHASSIS_W/2,ang:0,li:0};
+    let acc=0;
+    for(let k=0;k<segs.length;k++){
+      const s=segs[k];
+      if(dist<=acc+s.len || k===segs.length-1){
+        const local=Math.max(0,dist-acc);
+        const t=s.len>0?Math.min(1,local/s.len):1;
+        if(s.t==='l') return{x:s.x1+(s.x2-s.x1)*t,y:s.y1+(s.y2-s.y1)*t,ang:s.ang,li:s.li};
+        else{ let d=s.ta-s.fa; if(d>Math.PI)d-=2*Math.PI; if(d<-Math.PI)d+=2*Math.PI; return{x:s.x,y:s.y,ang:s.fa+d*t,li:s.li}; }
+      }
+      acc+=s.len;
+    }
+    const last=segs[segs.length-1];
+    return{x:last.x2??last.x,y:last.y2??last.y,ang:last.ang??0,li:nLanes-1};
+  }
+
+  /* ════════════════════════════════════════════════════════
+     MISSÃO
+  ════════════════════════════════════════════════════════ */
+  function updateDims(){
+    if(isMissionLocked()) return;
+    const h=parseFloat($inH.value), b=parseFloat($inB.value);
+    if(!isNaN(h)&&h>=0.5) paramH=h;
+    if(!isNaN(b)&&b>=0.2) paramB=b;
+    computePath();
+    updateHUD();
+    refreshBtns();
+  }
+  $inH.addEventListener('change',updateDims);
+  $inB.addEventListener('change',updateDims);
+  $inH.addEventListener('input', updateDims);
+  $inB.addEventListener('input', updateDims);
+
+  function isMissionLocked(){ return mState==='running'||mState==='paused'||mState==='homing'; }
+
+  function applyPreset(h,b){
+    if(isMissionLocked()){
+      toast('Cancele ou conclua a missão para alterar o terreno.','var(--yellow)');
+      return;
+    }
+    $inH.value=h; $inB.value=b; updateDims(); log(`Preset: ${h}m × ${b}m`,'i');
+  }
+
+  function setStatus(txt,color='var(--muted)'){ $statusTxt.textContent=txt; $statusTxt.style.color=color; }
+
+  async function startMission(){
+    if(isMissionLocked()) return;
+    updateDims();
+    targetProg=0; curProg=0;
+    mStartTime=Date.now(); mPauseAcc=0;
+    mState='running';
+    refreshBtns(); setStatus('Missão em andamento…','var(--green)');
+    await acquireWakeLock();
+
+    if(!port){ log('Sem conexão. Iniciando simulação…','w'); startSim(); return; }
+
+    log(`Enviando parâmetros: H=${paramH.toFixed(2)}m B=${paramB.toFixed(2)}m`,'i');
+    await sendSerial(`H${paramH.toFixed(2)}\n`);
+    await delay(300);
+    await sendSerial(`B${paramB.toFixed(2)}\n`);
+    await delay(300);
+    await sendSerial('START\n');
+    log('Comando START enviado!','s');
+    toast('Missão iniciada!','var(--green)');
+  }
+
+  function doPause(auto=false){
+    if(mState!=='running') return;
+    mState='paused'; mPauseStart=Date.now();
+    if(port) sendSerial('PAUSE\n');
+    log(auto?'Pausado automaticamente (perda de conexão).':'Missão pausada.','w');
+    setStatus('Pausado ⏸','var(--yellow)'); refreshBtns();
+    toast('Pausado','var(--yellow)');
+  }
+
+  function doResume(){
+    if(mState!=='paused') return;
+    mPauseAcc+=(Date.now()-(mPauseStart??Date.now())); mPauseStart=null;
+    mState='running';
+    if(port) sendSerial('RESUME\n');
+    log('Missão retomada.','s');
+    setStatus('Missão em andamento…','var(--green)'); refreshBtns();
+    toast('Retomado','var(--green)');
+  }
+
+  function doHome(){
+    if(mState!=='running'&&mState!=='paused') return;
+    if(!port){ cancelMission(false); return; }
+    mState='homing'; targetProg=0;
+    sendSerial('HOME\n');
+    log('Parada segura solicitada. O firmware não possui sensor de referência para retornar ao início.','o');
+    setStatus('Parada segura em andamento…','var(--orange)'); refreshBtns();
+    toast('Parando o robô com segurança','var(--orange)');
+  }
+
+  function cancelMission(send=true){
+    stopSim();
+    mState='cancelled'; targetProg=0; curProg=0;
+    mStartTime=null;
+    if(port&&send) sendSerial('CANCEL\n');
+    releaseWakeLock();
+    log('Missão cancelada.','e');
+    setStatus('Cancelado','var(--red)'); refreshBtns();
+    toast('Missão cancelada','var(--red)');
+    vibrate([200,100,200]);
+  }
+
+  function finishMission(){
+    stopSim();
+    mState='done'; targetProg=100;
+    releaseWakeLock();
+    log('🎉 Missão concluída!','s');
+    setStatus('Concluído ✓','var(--green)'); refreshBtns();
+    toast('🎉 Missão concluída!','var(--green)');
+    vibrate([100,50,100,50,300]);
+  }
+
+  function refreshBtns(){
+    const run  = mState==='running';
+    const pau  = mState==='paused';
+    const hom  = mState==='homing';
+    const act  = run||pau;
+    const lockArea = isMissionLocked();
+
+    $inH.disabled = lockArea;
+    $inB.disabled = lockArea;
+    document.querySelectorAll('.preset-btn').forEach(btn=>{ btn.disabled=lockArea; });
+
+    $btnStart.disabled  = run||pau||hom;
+    $btnSim.disabled    = (run||pau||hom)&&!simRunning;
+
+    $btnPause.style.display  = pau?'none':'inline-flex';
+    $btnPause.disabled       = !run;
+    $btnResume.style.display = pau?'inline-flex':'none';
+    $btnResume.disabled      = !pau;
+
+    $btnHome.disabled   = !act;
+    $btnCancel.disabled = !(act||hom);
+  }
+
+  $btnStart .addEventListener('click', startMission);
+  $btnPause .addEventListener('click', ()=>doPause(false));
+  $btnResume.addEventListener('click', doResume);
+  $btnHome  .addEventListener('click', doHome);
+  $btnCancel.addEventListener('click', ()=>cancelMission(true));
+
+  function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  /* ════════════════════════════════════════════════════════
+     SIMULAÇÃO — velocidade proporcional à área
+  ════════════════════════════════════════════════════════ */
+  function startSim(){
+    if(simRunning){ stopSim(); if(mState==='running') cancelMission(false); return; }
+    if(mState==='paused'||mState==='homing') return;
+    updateDims();
+    simRunning=true;
+    refreshBtns();
+    if(mState!=='running'){
+      mState='running'; mStartTime=Date.now(); mPauseAcc=0;
+      refreshBtns(); setStatus('Simulação…','var(--blue)');
+    }
+    $btnSim.textContent='⏹ Parar Simulação';
+    $btnSim.classList.replace('btn-ghost','btn-red');
+
+    const area=paramH*paramB;
+    const estSec=totalLen/ROBOT_SPEED;
+    simIntervalMs=Math.min(SIM_MAX_MS,Math.max(SIM_MIN_MS,(estSec*1000)/100));
+
+    log(`[SIM] Área=${area.toFixed(2)}m² | Faixas=${nLanes} | Duração≈${fmt(estSec)} | Passo=${simIntervalMs}ms`,'i');
+    toast(`Simulando ${area.toFixed(1)}m² · ${fmt(estSec)}`,'var(--blue)');
+    acquireWakeLock();
+
+    let step=0;
+    simTimer=setInterval(()=>{
+      if(mState==='paused') return;
+      if(mState!=='running'){ stopSim(); return; }
+      step++;
+      targetProg=Math.min(100,step);
+      if(step%20===0) log(`[SIM] Progresso: ${step}%`,'r');
+      if(step>=100){ stopSim(); finishMission(); }
+    }, simIntervalMs);
+  }
+
+  function stopSim(){
+    if(simTimer){ clearInterval(simTimer); simTimer=null; }
+    simRunning=false;
+    $btnSim.textContent='⚡ Simular Animação';
+    $btnSim.classList.replace('btn-red','btn-ghost');
+  }
+
+  $btnSim.addEventListener('click', startSim);
+
+  /* ════════════════════════════════════════════════════════
+     HUD / TELEMETRIA
+  ════════════════════════════════════════════════════════ */
+  function updateHUD(){
+    const total=paramH*paramB;
+    const cut  =(curProg/100)*total;
+    const dist =(curProg/100)*totalLen;
+    const st   =robotAt(dist);
+    robotX=st.x; robotY=st.y; robotAngle=st.ang;
+
+    $hudPos.textContent   =`X:${robotX.toFixed(2)} Y:${robotY.toFixed(2)}`;
+    $hudArea.textContent  =`${cut.toFixed(2)} m²`;
+    $hudTotal.textContent =`${total.toFixed(2)} m²`;
+    $hudFaixas.textContent=nLanes;
+    $hudLanes.textContent =`${mState==='done'?nLanes:Math.min(st.li,nLanes)} / ${nLanes}`;
+    $hudPct.textContent   =`${Math.round(curProg)}%`;
+    $hudBar.style.width   =`${curProg.toFixed(1)}%`;
+
+    const moving=mState==='running'||mState==='homing';
+    $hudSpeed.textContent =moving?`${ROBOT_SPEED.toFixed(2)} m/s`:'0.00 m/s';
+
+    // ETA
+    if(mState==='running'&&mStartTime&&curProg>0.5){
+      const el=(Date.now()-mStartTime-mPauseAcc)/1000;
+      const rem=(el/(curProg/100))-el;
+      $etaVal.textContent  =fmt(rem);
+      $elapsed.textContent =fmt(el);
+    } else if(mState==='paused'&&mStartTime){
+      const el=(mPauseStart?mPauseStart-mStartTime:Date.now()-mStartTime-mPauseAcc)/1000;
+      $elapsed.textContent=fmt(el);
+    } else if(mState==='idle'||mState==='cancelled'){
+      $etaVal.textContent='--:--'; $elapsed.textContent='00:00';
+    }
+
+    // Relé
+    const cutting=mState==='running'&&curProg<99.5;
+    const homing =mState==='homing';
+    const done   =mState==='done';
+    $relayDot.className='relay-dot '+(cutting?'cut':homing?'home':done?'done':'off');
+    $relayTxt.textContent=cutting?'ATIVO (Corte)':homing?'RETORNO':done?'CONCLUÍDO':'DESLIGADO';
+    $relayTxt.style.color=cutting?'var(--green)':homing?'var(--yellow)':done?'var(--green)':'var(--red)';
+  }
+
+  /* ════════════════════════════════════════════════════════
+     CANVAS
+  ════════════════════════════════════════════════════════ */
+  function resizeCanvas(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=r.width*dpr; canvas.height=r.height*dpr;
+    ctx.resetTransform(); ctx.scale(dpr,dpr);
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  if(window.ResizeObserver) new ResizeObserver(resizeCanvas).observe($wrap);
+
+  function rrect(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);
+    if(typeof ctx.roundRect==='function'){ ctx.roundRect(x,y,w,h,r); return; }
+    ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+  }
+
+  function render(){
+    const rw=$wrap.getBoundingClientRect().width;
+    const rh=$wrap.getBoundingClientRect().height;
+    ctx.clearRect(0,0,rw,rh);
+
+    const mg=50;
+    const bsX=Math.max(60,rw-mg*2)/paramH;
+    const bsY=Math.max(60,rh-mg*2)/paramB;
+    const base=Math.min(bsX,bsY);
+    const sc=base*vzoom;
+
+    $cScale.textContent=`${Math.round(vzoom*100)}% · 1m=${sc.toFixed(0)}px`;
+
+    const ox=mg+((rw-mg*2)-paramH*sc)/2+vx;
+    const oy=mg+((rh-mg*2)-paramB*sc)/2+vy;
+    const fw=paramH*sc, fh=paramB*sc;
+
+    // Gramado
+    ctx.fillStyle='#0a1f14';
+    ctx.fillRect(ox,oy,fw,fh);
+
+    // Grade 0.5m
+    ctx.strokeStyle='rgba(16,185,129,.07)'; ctx.lineWidth=1;
+    for(let x=0;x<=paramH+.001;x+=.5){ ctx.beginPath();ctx.moveTo(ox+x*sc,oy);ctx.lineTo(ox+x*sc,oy+fh);ctx.stroke(); }
+    for(let y=0;y<=paramB+.001;y+=.5){ ctx.beginPath();ctx.moveTo(ox,oy+y*sc);ctx.lineTo(ox+fw,oy+y*sc);ctx.stroke(); }
+
+    // Grama cortada
+    const cDist=(curProg/100)*totalLen;
+    const cSt=robotAt(cDist);
+    const sH=CHASSIS_W*sc;
+    ctx.fillStyle='rgba(16,185,129,.35)';
+    if(curProg>=99.7){
+      ctx.fillRect(ox,oy,fw,fh);
+    } else {
+      for(let i=0;i<nLanes;i++){
+        const sy=oy+i*sH;
+        if(i<cSt.li){ ctx.fillRect(ox,sy,fw,sH); }
+        else if(i===cSt.li&&curProg>0){
+          const fwd=i%2===0, cpx=ox+cSt.x*sc;
+          if(fwd){ const cw=Math.max(0,cpx-ox+(CHASSIS_W/2)*sc); ctx.fillRect(ox,sy,Math.min(fw,cw),sH); }
+          else   { const cw=Math.max(0,(ox+fw)-(cpx-(CHASSIS_W/2)*sc)); ctx.fillRect(Math.max(ox,cpx-(CHASSIS_W/2)*sc),sy,cw,sH); }
+        }
+      }
+    }
+
+    // Rota planejada
+    ctx.strokeStyle='rgba(56,189,248,.28)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); let first=true;
+    for(const s of segs){ if(s.t==='l'){ const sx=ox+s.x1*sc,sy=oy+s.y1*sc,ex=ox+s.x2*sc,ey=oy+s.y2*sc; if(first){ctx.moveTo(sx,sy);first=false;}ctx.lineTo(ex,ey); } }
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // Contorno tracejado
+    ctx.strokeStyle='rgba(56,189,248,.6)'; ctx.lineWidth=1.5;
+    ctx.setLineDash([6,5]); ctx.strokeRect(ox,oy,fw,fh); ctx.setLineDash([]);
+
+    // Cota H (superior)
+    const cy=oy-18;
+    ctx.strokeStyle=ctx.fillStyle='#38bdf8'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(ox,cy);ctx.lineTo(ox+fw,cy);
+    ctx.moveTo(ox,cy-4);ctx.lineTo(ox,cy+4);
+    ctx.moveTo(ox+fw,cy-4);ctx.lineTo(ox+fw,cy+4);
+    ctx.stroke();
+    ctx.font='bold 10px Consolas,monospace'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(`H=${paramH.toFixed(2)}m`,ox+fw/2,cy-2);
+
+    // Cota B (direita)
+    const cx2=ox+fw+16;
+    ctx.beginPath(); ctx.moveTo(cx2,oy);ctx.lineTo(cx2,oy+fh);
+    ctx.moveTo(cx2-4,oy);ctx.lineTo(cx2+4,oy);
+    ctx.moveTo(cx2-4,oy+fh);ctx.lineTo(cx2+4,oy+fh);
+    ctx.stroke();
+    ctx.save(); ctx.translate(cx2+11,oy+fh/2); ctx.rotate(Math.PI/2);
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(`B=${paramB.toFixed(2)}m`,0,0); ctx.restore();
+
+    // Cantos cyberpunk
+    const L=9; ctx.strokeStyle='#38bdf8'; ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(ox-3,oy-3+L);ctx.lineTo(ox-3,oy-3);ctx.lineTo(ox-3+L,oy-3);
+    ctx.moveTo(ox+fw+3-L,oy-3);ctx.lineTo(ox+fw+3,oy-3);ctx.lineTo(ox+fw+3,oy-3+L);
+    ctx.moveTo(ox-3,oy+fh+3-L);ctx.lineTo(ox-3,oy+fh+3);ctx.lineTo(ox-3+L,oy+fh+3);
+    ctx.moveTo(ox+fw+3-L,oy+fh+3);ctx.lineTo(ox+fw+3,oy+fh+3);ctx.lineTo(ox+fw+3,oy+fh+3-L);
+    ctx.stroke();
+
+    // Robô
+    drawRobot(ox+cSt.x*sc, oy+cSt.y*sc, cSt.ang, CHASSIS_W*sc);
+  }
+
+  function drawRobot(px,py,angle,size){
+    ctx.save(); ctx.translate(px,py); ctx.rotate(angle);
+    const h=size/2;
+
+    // Rodas
+    const wW=size*.38,wH=size*.18,wXo=size*.24,wYo=h+wH*.28;
+    ctx.fillStyle='#0f172a'; ctx.strokeStyle='#334155'; ctx.lineWidth=1;
+    [[wXo-wW/2,-wYo],[-wXo-wW/2,-wYo],[wXo-wW/2,wYo-wH],[-wXo-wW/2,wYo-wH]].forEach(([wx,wy])=>{
+      ctx.fillRect(wx,wy,wW,wH); ctx.strokeRect(wx,wy,wW,wH);
+      ctx.fillStyle='#1e293b'; ctx.fillRect(wx+wW*.28,wy+1,wW*.44,wH-2); ctx.fillStyle='#0f172a';
+    });
+
+    // Chassi
+    ctx.fillStyle='#111827'; ctx.strokeStyle='#38bdf8';
+    ctx.lineWidth=2; ctx.shadowColor='rgba(56,189,248,.55)'; ctx.shadowBlur=7;
+    ctx.beginPath(); rrect(-h,-h,size,size,4); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur=0;
+
+    // Placa interna
+    ctx.fillStyle='#1e293b';
+    ctx.beginPath(); rrect(-h*.77,-h*.77,size*.77,size*.77,3); ctx.fill();
+
+    // Seta
+    ctx.fillStyle='#38bdf8';
+    ctx.beginPath();
+    ctx.moveTo(h*.54,0);ctx.lineTo(h*.14,-h*.32);ctx.lineTo(h*.14,-h*.13);
+    ctx.lineTo(-h*.4,-h*.13);ctx.lineTo(-h*.4,h*.13);ctx.lineTo(h*.14,h*.13);ctx.lineTo(h*.14,h*.32);
+    ctx.closePath(); ctx.fill();
+
+    // LED do relé
+    const cutting=mState==='running'&&curProg<99.5;
+    const homing =mState==='homing';
+    const led=cutting?'#10b981':homing?'#facc15':'#ef4444';
+    ctx.save(); ctx.shadowColor=led; ctx.shadowBlur=10; ctx.fillStyle=led;
+    ctx.beginPath(); ctx.arc(0,0,Math.max(2.5,size*.1),0,Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  /* ════════════════════════════════════════════════════════
+     CÂMERA – PAN, ZOOM, TOUCH
+  ════════════════════════════════════════════════════════ */
+  // Mouse drag
+  canvas.addEventListener('mousedown',e=>{ drag=true; dragX=e.clientX-vx; dragY=e.clientY-vy; canvas.classList.add('grab'); });
+  window.addEventListener('mousemove',e=>{ if(drag){ vx=e.clientX-dragX; vy=e.clientY-dragY; } });
+  window.addEventListener('mouseup',  ()=>{ drag=false; canvas.classList.remove('grab'); });
+
+  // Scroll zoom
+  canvas.addEventListener('wheel',e=>{ e.preventDefault(); vzoom=Math.min(5,Math.max(.25,vzoom*(e.deltaY<0?1.12:.88))); },{passive:false});
+
+  // Touch pan + pinch
+  let touches={}, lastPinch=null;
+  canvas.addEventListener('touchstart',e=>{
+    Array.from(e.changedTouches).forEach(t=>touches[t.identifier]={x:t.clientX,y:t.clientY});
+    if(e.touches.length===2){
+      const a=e.touches[0],b=e.touches[1];
+      lastPinch=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+    }
+  },{passive:true});
+
+  canvas.addEventListener('touchmove',e=>{
+    if(e.touches.length===1){
+      const t=e.touches[0];
+      const prev=touches[t.identifier];
+      if(prev){ vx+=t.clientX-prev.x; vy+=t.clientY-prev.y; }
+      touches[t.identifier]={x:t.clientX,y:t.clientY};
+    } else if(e.touches.length===2&&lastPinch!==null){
+      const a=e.touches[0],b=e.touches[1];
+      const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+      vzoom=Math.min(5,Math.max(.25,vzoom*(d/lastPinch)));
+      lastPinch=d;
+      Array.from(e.touches).forEach(t=>touches[t.identifier]={x:t.clientX,y:t.clientY});
+    }
+  },{passive:true});
+
+  canvas.addEventListener('touchend',e=>{
+    Array.from(e.changedTouches).forEach(t=>delete touches[t.identifier]);
+    if(e.touches.length<2) lastPinch=null;
+  },{passive:true});
+
+  $btnCenter.addEventListener('click',()=>{ vx=0;vy=0;vzoom=1; log('🎯 Câmera centralizada.','i'); });
+
+  /* ════════════════════════════════════════════════════════
+     NAVEGAÇÃO POR ABAS (MOBILE)
+  ════════════════════════════════════════════════════════ */
+  const tabBtns=document.querySelectorAll('.tab-btn');
+  const panes  ={
+    paneControl: document.getElementById('paneControl'),
+    paneMap    : document.getElementById('paneMap'),
+    paneLog    : document.getElementById('paneLog'),
+  };
+
+  tabBtns.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const target=btn.dataset.tab;
+      tabBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Mobile: esconde tudo, mostra target
+      const isMobile=window.innerWidth<768;
+      if(isMobile){
+        Object.keys(panes).forEach(k=>{
+          const el=panes[k];
+          if(!el) return;
+          // paneLog está dentro de paneMap no desktop, mas é seu próprio pane no mobile
+          el.classList.toggle('active', k===target);
+        });
+        // paneMap inclui paneLog — quando paneLog é selecionado, rola para o log
+        if(target==='paneLog'){
+          document.getElementById('paneMap').classList.add('active');
+          setTimeout(()=>document.getElementById('paneLog').scrollIntoView({behavior:'smooth'}),50);
+        }
+      }
+    });
+  });
+
+  /* ════════════════════════════════════════════════════════
+     LOOP PRINCIPAL
+  ════════════════════════════════════════════════════════ */
+  function loop(){
+    const diff=targetProg-curProg;
+    if(Math.abs(diff)<.04) curProg=targetProg;
+    else                    curProg+=diff*.08;
+
+    updateHUD();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  /* ════════════════════════════════════════════════════════
+     INIT
+  ════════════════════════════════════════════════════════ */
+  window.addEventListener('DOMContentLoaded',()=>{
+    resizeCanvas();
+    computePath();
+    updateHUD();
+    refreshBtns();
+    log('Dashboard pronto. Conecte o HC-05 ou use Simular.','s');
+    requestAnimationFrame(loop);
+  });
+  </script>
+</body>
+</html>
